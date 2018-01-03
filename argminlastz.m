@@ -9,12 +9,5 @@ function [z] = argminlastz(targets, eps, w, a_in, beta)
 
     m = w*a_in;
     z = (targets - eps + beta*m)./(1+beta);
-    
-    % z = zeros(size(targets));
-    
-    % for i=1:size(z,1)
-    %     for j=1:size(z,2)
-    %         z(i,j) = argminlast_ez( targets(i,j), eps(i,j), m(i,j), beta);
-    %     end
-    % end
+        
 end
