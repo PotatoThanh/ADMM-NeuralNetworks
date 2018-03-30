@@ -30,7 +30,7 @@ n_outputs = 10  # MNIST classes from 0-9 digits
 n_hiddens = 256  # number of neurons
 
 n_batches = np.shape(trainX)[1] # 55000 number of samples for training
-train_epochs = 100
+train_epochs = 15
 warm_epochs = 10
 
 beta = 5.0
@@ -68,4 +68,4 @@ for i in range(train_epochs):
 
 # Evaluate Model on test set
 loss, accuracy = model.evaluate(testX, testY)
-print("Loss: %d, accuracy:")
+print("Loss valid: %3f, accuracy valid: %3f" % (np.array(loss), np.array(accuracy)))
