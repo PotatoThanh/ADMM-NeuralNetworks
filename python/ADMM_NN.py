@@ -4,9 +4,7 @@ from __future__ import print_function
 
 import tensorflow as tf
 import numpy as np
-import tensorflow.contrib.eager as tfe
-
-# tfe.enable_eager_execution()
+import matplotlib.pyplot as plt
 
 class ADMM_NN(object):
     """ Class for ADMM Neural Network. """
@@ -45,7 +43,7 @@ class ADMM_NN(object):
         :param x: input x
         :return: max 0 and x
         """
-        return tf.maximum(0.0,x)
+        return tf.maximum(0.,x)
 
     def _weight_update(self, layer_output, activation_input):
         """
@@ -58,8 +56,9 @@ class ADMM_NN(object):
         :return: weight matrix
         """
         pinv = np.linalg.pinv(activation_input)
-        # pinv = tf.matmul(tf.matrix_inverse(tf.matmul(tf.matrix_transpose(activation_input), activation_input)),tf.matrix_transpose(activation_input))
+
         weight_matrix = tf.matmul(tf.cast(layer_output, tf.float32), tf.cast(pinv, tf.float32))
+
         return weight_matrix
 
     def _activation_update(self, next_weight, next_layer_output, layer_nl_output, beta, gamma):
@@ -112,17 +111,24 @@ class ADMM_NN(object):
         z2 = np.zeros_like(a)
         z  = np.zeros_like(a)
 
-        tf.where(sol1>=0.0, z1, sol1)
-        tf.where(sol2<=0.0, z2, sol2)
+        sol1 = np.array(sol1)
+        sol2 = np.array(sol2)
+
+        z1[sol1>=0.] = sol1[sol1>=0.]
+        z2[sol2<=0.] = sol2[sol2<=0.]
 
         fz_1 = tf.square(gamma * (a - self._relu(z1))) + beta * (tf.square(z1 - m))
         fz_2 = tf.square(gamma * (a - self._relu(z2))) + beta * (tf.square(z2 - m))
 
+        fz_1 = np.array(fz_1)
+        fz_2 = np.array(fz_2)
+
         index_z1 = fz_1<=fz_2
         index_z2 = fz_2<fz_1
 
-        tf.where(index_z1, z, z1)
-        tf.where(index_z2, z, z2)
+        z[index_z1] = z1[index_z1]
+        z[index_z2] = z2[index_z2]
+
         return z
 
     def _argminlastz(self, targets, eps, w, a_in, beta):
@@ -163,7 +169,7 @@ class ADMM_NN(object):
         outputs = tf.matmul(self.w3, outputs)
         return outputs
 
-    def fit(self, inputs, labels, epochs, beta, gamma):
+    def fit(self, inputs, labels, beta, gamma):
         """
         Training ADMM Neural Network by minimizing sub-problems
         :param inputs: input of training data samples
@@ -174,9 +180,58 @@ class ADMM_NN(object):
         :return: loss value
         """
         self.a0 = inputs
-        for i in range(epochs):
-            print(i)
 
+        # Input layer
+        self.w1 = self._weight_update(self.z1, self.a0)
+        self.a1 = self._activation_update(self.w2, self.z2, self.z1, beta, gamma)
+        self.z1 = self._argminz(self.a1, self.w1, self.a0, beta, gamma)
+
+        # Hidden layer
+        self.w2 = self._weight_update(self.z2, self.a1)
+        self.a2 = self._activation_update(self.w3, self.z3, self.z2, beta, gamma)
+        self.z2 = self._argminz(self.a2, self.w2, self.a1, beta, gamma)
+
+        # Output layer
+        self.w3 = self._weight_update(self.z3, self.a2)
+        self.z3 = self._argminlastz(labels, self.lambda_larange, self.w3, self.a2, beta)
+        self.lambda_larange = self._lambda_update(self.z3, self.w3, self.a2, beta)
+
+        loss, accuracy = self.evaluate(inputs, labels)
+        return loss, accuracy
+
+    def evaluate(self, inputs, labels, isCategrories = True ):
+        """
+        Calculate loss and accuracy (only classification)
+        :param inputs: inputs data
+        :param outputs: ground truth
+        :param isCategrories: classification or not
+        :return: loss and accuracy (only classification)
+        """
+        forward = self.feed_forward(inputs)
+        loss = tf.reduce_mean(tf.square(forward - labels))
+
+        if isCategrories:
+            accuracy = tf.equal(tf.argmax(labels, axis=0), tf.argmax(forward, axis=0))
+            accuracy = tf.reduce_sum(tf.cast(accuracy, tf.int32)) / accuracy.get_shape()[0]
+
+        else:
+            accuracy = loss
+
+        return loss, accuracy
+
+    def warming(self, inputs, labels, epochs, beta, gamma):
+        """
+        Warming ADMM Neural Network by minimizing sub-problems without update lambda
+        :param inputs: input of training data samples
+        :param outputs: label of training data samples
+        :param epochs: number of epochs
+        :param beta: value of beta
+        :param gamma: value of gamma
+        :return:
+        """
+        self.a0 = inputs
+        for i in range(epochs):
+            print("------ Warming: {:d} ------".format(i))
             # Input layer
             self.w1 = self._weight_update(self.z1, self.a0)
             self.a1 = self._activation_update(self.w2, self.z2, self.z1, beta, gamma)
@@ -190,22 +245,16 @@ class ADMM_NN(object):
             # Output layer
             self.w3 = self._weight_update(self.z3, self.a2)
             self.z3 = self._argminlastz(labels, self.lambda_larange, self.w3, self.a2, beta)
-            self.lambda_larange = self._lambda_update(self.z3, self.w3, self.a2, beta)
 
-            forward = self.feed_forward(inputs)
-            loss_train = tf.reduce_mean(tf.square(forward - labels))
-            # accuracy = np.zeros_like(forward)
-            # tf.where(tf.argmax(forward, axis=1), accuracy, np.ones_like(forward))
-            # accuracy = tf.reduce_sum(accuracy)
-            print(loss_train)
-            # print(accuracy)
-        return loss_train
+    def drawcurve(self, train_, valid_, id, legend_1, legend_2):
+        acc_train = np.array(train_).flatten()
+        acc_test = np.array(valid_).flatten()
 
-    # def predict(self, inputs):
-    #
-    #
-    #
-    # def fit(self, inputs, outputs,):
-    #
-    # def evaluate(self, inputs, outputs, isCategrories = False ):
+        plt.figure(id)
+        plt.plot(acc_train)
+        plt.plot(acc_test)
 
+        plt.legend([legend_1, legend_2], loc='upper left')
+        plt.draw()
+        plt.pause(0.001)
+        return 0
