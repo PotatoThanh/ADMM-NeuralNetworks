@@ -1,5 +1,5 @@
 # ADMM-NeuralNetworks
-Training Neural Networks Without Gradients: A ADMM Approach (Matlab, Tensorflow1.6-Python2.7/3.5 with eager execution and matplotlib)
+Training Neural Networks Without Gradients: An ADMM Approach (Matlab, Tensorflow1.6-Python2.7/3.5 with eager execution and matplotlib)
 Note: You cannot use this code for any assignment or any profit product. 
 
 # This code was implemented follow below paper; however, I used Mean Square Error loss instead of Binary Hinge loss
